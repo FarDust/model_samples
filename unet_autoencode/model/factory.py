@@ -20,13 +20,13 @@ class UNetFactory:
         block_qty = int(np.log2(self.latent_space_filter_rate))
 
         self.__encoder_blocks = [
-            Conv2DBlock(self.n_filters * (2 ** i), self.config, self.batch_norm)
+            Conv2DBlock(self.n_filters * (2**i), self.config, self.batch_norm)
             for i in range(block_qty)
         ]
 
         self.__decorder_blocks = [
             Conv2DTransposeBlock(
-                self.n_filters * (2 ** i), self.config, self.batch_norm
+                self.n_filters * (2**i), self.config, self.batch_norm
             )
             for i in range(block_qty)
         ]
