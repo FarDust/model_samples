@@ -1,9 +1,10 @@
-import datetime
+from datetime import datetime
 from tensorflow.data import Dataset
 from tensorflow.keras.layers import Input
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from unet_autoencode.model.factory import UNetFactory
 from unet_autoencode.model.blocks import Conv2DConfig
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
 
 
 def create_model():
@@ -48,7 +49,7 @@ def create_train_generator(directory: str, input_shape: tuple, batch_size: int):
         **generator_kargs
     )
 
-    seed = int(datetime.now())
+    seed = int(datetime.now().timestamp())
 
     shared_kargs_params = {
         "seed": seed,
@@ -59,22 +60,41 @@ def create_train_generator(directory: str, input_shape: tuple, batch_size: int):
     }
 
     return zip(train_images_datagen.flow_from_directory(
-        directory,
-        subset="images",
+        f"{directory}/images",
+        subset="training",
         **shared_kargs_params
     ), train_masks_datagen.flow_from_directory(
-        directory,
-        subset="masks",
+        f"{directory}/masks",
+        subset="training",
+        **shared_kargs_params
+    )), zip(train_images_datagen.flow_from_directory(
+        f"{directory}/images",
+        subset="validation",
+        **shared_kargs_params
+    ), train_masks_datagen.flow_from_directory(
+        f"{directory}/masks",
+        subset="validation",
         **shared_kargs_params
     ))
-    
-
 
 def main():
     # Create the U-Net model.
     model = create_model()
-    train_generator = create_train_generator('data/train', (256, 256, 3), batch_size=32)
-    model.fit(train_generator, steps_per_epoch=2000, epochs=50)
+    batch_size = 8
+    train_generator, validation_generator = create_train_generator('./data/salt/train', (256, 256), batch_size=batch_size)
+    callbacks = [
+        EarlyStopping(patience=10, verbose=1),
+        ReduceLROnPlateau(factor=0.1, patience=5, min_lr=0.00001, verbose=1),
+        ModelCheckpoint('model-salt_weights.h5', verbose=1, save_best_only=True, save_weights_only=True)
+    ]
+    model.fit(
+        train_generator,
+        steps_per_epoch=3200 // batch_size,
+        validation_data = validation_generator, 
+        validation_steps = 800 // batch_size,
+        epochs=50,
+        callbacks=callbacks
+        )
     model.save("model.h5")
     model.save_weights("model_weights.h5")
 
